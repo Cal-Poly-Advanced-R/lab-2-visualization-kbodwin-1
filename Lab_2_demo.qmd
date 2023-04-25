@@ -1,0 +1,113 @@
+---
+title: "Lab 2 Walkthrough"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(readxl)
+```
+
+```{r}
+dat <- read_excel("wgm2018-dataset-crosstabs-all-countries.xlsx", 
+                  sheet = 1,
+                  skip = 2)
+```
+
+```{r}
+dat_clean <- dat %>%
+  janitor::clean_names() %>%
+  select(country:column_n_percent_4) %>%
+  fill(question, .direction = "down")
+  
+```
+
+```{r}
+dat_q25 <- dat_clean %>%
+  filter(str_detect(question, "Q25 "))
+```
+
+```{r}
+dat_q25 %>%
+  ggplot(aes(x = country, y = column_n_percent_4, fill = response)) + 
+  geom_col()
+```
+
+
+```{r}
+library(rvest)
+
+regions <- read_html("https://meta.wikimedia.org/wiki/List_of_countries_by_regional_classification") %>%
+  html_table() %>%
+  .[[1]]
+```
+
+
+
+```{r}
+dat_q25 <- dat_q25 %>%
+  left_join(regions,
+            by = c(country = "Country")) %>%
+  drop_na(Region)
+```
+
+
+```{r}
+dat_q25 %>%
+  ggplot(aes(x = Region, y = column_n_percent_4, fill = response)) +
+  geom_col()
+```
+
+
+
+```{r}
+dat_vax <- dat_q25 %>%
+  filter(str_detect(response, " agree")) %>%
+  group_by(country, Region) %>% 
+  summarize(pct = sum(column_n_percent_4))
+```
+
+```{r}
+dat_vax %>%
+  ggplot(aes(x = Region, y = pct, fill = Region)) +
+  geom_boxplot(alpha = 0.5) +
+  geom_jitter(aes(color = Region), width = 0.1) +
+  theme_classic() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45),
+        axis.line.x = element_blank())+
+  labs(
+    x = "",
+    y = "",
+    title = "Percent of surveyed residents who say vaccines are safe."
+  )
+```
+
+
+```{r}
+library(ggiraph)
+
+my_plot <- dat_vax %>%
+  ggplot(aes(x = Region, y = pct, fill = Region)) +
+  geom_boxplot(alpha = 0.5) +
+  geom_jitter_interactive(aes(color = Region,
+                              tooltip = country), width = 0.1) +
+  theme_classic() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45),
+        axis.line.x = element_blank())+
+  labs(
+    x = "",
+    y = "",
+    title = "Percent of surveyed residents who say vaccines are safe."
+  )
+
+girafe(ggobj = my_plot)
+```
+
+
+
+
